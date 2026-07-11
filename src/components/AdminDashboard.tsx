@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { DbSchema, SystemSettings, ThemeSettings, FontSettings, CouncilsData, ReferencePage, MainProgram, EventItem, GalleryAlbum, SurveyItem, MemberProfile, AdminLog, BoardMember } from "../types";
+import { DbSchema, SystemSettings, ThemeSettings, FontSettings, CouncilsData, ReferencePage, MainProgram, SubProgram, EventItem, GalleryAlbum, SurveyItem, MemberProfile, AdminLog, BoardMember } from "../types";
 import {
   adminLogin,
   fetchFullAdminData,
@@ -28,7 +28,7 @@ import {
 import {
   Lock, LayoutDashboard, Palette, Type, Users, FileText, FolderGit, Ticket, BarChart3, Image, Database, Activity,
   Settings, Save, Plus, Trash2, Eye, UserCheck, Shield, AlertTriangle, RefreshCw, Upload, Download, Check, X, Phone, Mail, Edit, ImageIcon, BookOpen, Calendar, Clock, Share2, MapPin,
-  Twitter, Instagram, Youtube, MessageCircle, Facebook, Send
+  Twitter, Instagram, Youtube, MessageCircle, Facebook, Send, ChevronUp, ChevronDown, GripVertical
 } from "lucide-react";
 
 export function AdminDashboard({
@@ -579,6 +579,51 @@ export function AdminDashboard({
     };
     reader.readAsDataURL(file);
   };
+
+  const sortProgramsByOrder = (programs: MainProgram[]) =>
+    [...programs].sort((a, b) => {
+      const orderDiff = (a.order ?? 9999) - (b.order ?? 9999);
+      if (orderDiff !== 0) return orderDiff;
+      return a.name.localeCompare(b.name, "ar");
+    });
+
+  const sortSubProgramsByOrder = (subs: SubProgram[]) =>
+    [...subs].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+
+  const withNormalizedProgramOrders = (programs: MainProgram[]) =>
+    sortProgramsByOrder(programs).map((program, idx) => ({ ...program, order: idx + 1 }));
+
+  const moveProgramOrder = (programs: MainProgram[], programId: string, direction: "up" | "down") => {
+    const sorted = sortProgramsByOrder(programs);
+    const index = sorted.findIndex((program) => program.id === programId);
+    if (index < 0) return programs;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return programs;
+    const next = [...sorted];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    return withNormalizedProgramOrders(next);
+  };
+
+  const moveSubProgramOrder = (
+    programs: MainProgram[],
+    programId: string,
+    subId: string,
+    direction: "up" | "down"
+  ) =>
+    programs.map((program) => {
+      if (program.id !== programId) return program;
+      const sorted = sortSubProgramsByOrder(program.subPrograms);
+      const index = sorted.findIndex((sub) => sub.id === subId);
+      if (index < 0) return program;
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= sorted.length) return program;
+      const nextSubs = [...sorted];
+      [nextSubs[index], nextSubs[targetIndex]] = [nextSubs[targetIndex], nextSubs[index]];
+      return {
+        ...program,
+        subPrograms: nextSubs.map((sub, idx) => ({ ...sub, order: idx + 1 }))
+      };
+    });
 
   const handleSaveProgram = (progId: string) => {
     if (!db) return;
@@ -2552,6 +2597,7 @@ export function AdminDashboard({
                           name: addProgName.trim(),
                           image: addProgImage.trim() || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600",
                           description: addProgDesc.trim() || "برنامج مجتمعي فاعل ومخصص لخدمة أفراد المجتمع.",
+                          order: db.programs.length + 1,
                           subPrograms: []
                         };
                         saveAction("إضافة برنامج رئيسي", saveAdminPrograms(adminId, [...db.programs, newProg]));
@@ -2571,8 +2617,63 @@ export function AdminDashboard({
                 </div>
               )}
 
+              {db.programs.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-3">
+                  <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                    <GripVertical className="w-4 h-4 text-[var(--primary-color)]" />
+                    ترتيب عرض البرامج الرئيسية في الموقع
+                  </h3>
+                  <p className="text-xs text-slate-500">استخدم الأسهم لتحريك البرامج لأعلى أو لأسفل. الترتيب يظهر مباشرة في صفحة البرامج للزوار.</p>
+                  <div className="space-y-2">
+                    {sortProgramsByOrder(db.programs).map((program, idx, sorted) => (
+                      <div key={program.id} className="flex items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-8 h-8 rounded-full bg-[var(--primary-color)] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                            {program.order ?? idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-slate-800 truncate">{program.name}</p>
+                            <p className="text-[10px] text-slate-400">{program.subPrograms.length} مبادرة فرعية</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={idx === 0 || loading}
+                            onClick={() =>
+                              saveAction(
+                                "ترتيب البرامج الرئيسية",
+                                saveAdminPrograms(adminId, moveProgramOrder(db.programs, program.id, "up"))
+                              )
+                            }
+                            className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="تحريك لأعلى"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === sorted.length - 1 || loading}
+                            onClick={() =>
+                              saveAction(
+                                "ترتيب البرامج الرئيسية",
+                                saveAdminPrograms(adminId, moveProgramOrder(db.programs, program.id, "down"))
+                              )
+                            }
+                            className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="تحريك لأسفل"
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-6">
-                {db.programs.map((prog, pIdx) => (
+                {sortProgramsByOrder(db.programs).map((prog, pIdx) => (
                   <div key={prog.id} className="border border-slate-200 rounded-3xl p-6 bg-white shadow-xs space-y-6">
                     
                     {/* Header Row of Main Program */}
@@ -2583,6 +2684,9 @@ export function AdminDashboard({
                         </div>
                         <div>
                           <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--primary-color)] text-white text-xs font-bold">
+                              {prog.order ?? pIdx + 1}
+                            </span>
                             {prog.name}
                           </h3>
                           <p className="text-xs text-slate-400 mt-0.5">معرف البرنامج: {prog.id}</p>
@@ -2973,13 +3077,16 @@ export function AdminDashboard({
                         </div>
                       ) : (
                         <div className="space-y-4 pl-2 pr-2">
-                          {prog.subPrograms.map((sub, sIdx) => (
+                          {sortSubProgramsByOrder(prog.subPrograms).map((sub, sIdx, sortedSubs) => (
                             <div key={sub.id} className="p-4 bg-white border border-slate-150 rounded-2xl shadow-2xs space-y-3">
                               
                               <div className="flex justify-between items-start gap-4">
                                 <div>
                                   <p className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
                                     <span className="w-2 h-2 rounded-full bg-[var(--primary-color)]" />
+                                    <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded bg-slate-100 text-[10px] font-bold text-slate-600">
+                                      {sub.order ?? sIdx + 1}
+                                    </span>
                                     {sub.title}
                                   </p>
                                   <p className="text-slate-500 mt-1 text-xs line-clamp-2 leading-relaxed">{sub.description}</p>
@@ -3011,7 +3118,35 @@ export function AdminDashboard({
                                   </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                  <button
+                                    type="button"
+                                    disabled={sIdx === 0 || loading}
+                                    onClick={() =>
+                                      saveAction(
+                                        "ترتيب المبادرات الفرعية",
+                                        saveAdminPrograms(adminId, moveSubProgramOrder(db.programs, prog.id, sub.id, "up"))
+                                      )
+                                    }
+                                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+                                    title="تحريك المبادرة لأعلى"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={sIdx === sortedSubs.length - 1 || loading}
+                                    onClick={() =>
+                                      saveAction(
+                                        "ترتيب المبادرات الفرعية",
+                                        saveAdminPrograms(adminId, moveSubProgramOrder(db.programs, prog.id, sub.id, "down"))
+                                      )
+                                    }
+                                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+                                    title="تحريك المبادرة لأسفل"
+                                  >
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                  </button>
                                   {/* Edit Sub-program Trigger */}
                                   <button
                                     onClick={() => {

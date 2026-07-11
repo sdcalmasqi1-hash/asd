@@ -36,6 +36,12 @@ export function ProgramsSection({
   // Filter out hidden subprograms for public view
   const visibleSubPrograms = (sub: SubProgram[]) => sub.filter(s => !s.isHidden).sort((a, b) => a.order - b.order);
 
+  const sortedPrograms = [...programs].sort((a, b) => {
+    const orderDiff = (a.order ?? 9999) - (b.order ?? 9999);
+    if (orderDiff !== 0) return orderDiff;
+    return a.name.localeCompare(b.name, "ar");
+  });
+
   // Helper to check if user already booked
   const isUserRegisteredToSub = (sub: SubProgram) => {
     if (!loggedInMember) return false;
@@ -413,7 +419,7 @@ export function ProgramsSection({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {programs.map((program) => (
+        {sortedPrograms.map((program) => (
           <div
             key={program.id}
             onClick={() => setSelectedProgram(program)}

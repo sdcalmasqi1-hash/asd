@@ -145,6 +145,7 @@ export interface MainProgram {
   name: string;
   image: string;
   description: string;
+  order?: number;
   subPrograms: SubProgram[];
 }
 
