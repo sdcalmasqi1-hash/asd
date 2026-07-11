@@ -8,7 +8,7 @@ import { DbSchema, MemberProfile, EventItem, MainProgram, FAQItem, SystemSetting
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 
 /** Official public website URL — QR codes always use this, never localhost */
-export const DEFAULT_PUBLIC_SITE_URL = "https://almasqi-sac.org.sa";
+export const DEFAULT_PUBLIC_SITE_URL = "https://almasqi-sac.onrender.com";
 
 // Dynamic Theme Applicator Helper
 export function applyThemeAndFonts(theme: ThemeSettings, fonts: FontSettings, isDark?: boolean) {
@@ -62,8 +62,17 @@ export function applyThemeAndFonts(theme: ThemeSettings, fonts: FontSettings, is
   root.style.setProperty("--text-font", fontMap[fonts.textFont] || fontMap["Cairo"]);
 }
 
-/** Public site URL for QR codes & sharing — always the live internet domain */
+/** Public site URL for QR codes & sharing */
 export function getPublicSiteOrigin(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const origin = window.location.origin.replace(/\/$/, "");
+    const isLocal =
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin) ||
+      origin.startsWith("file:");
+    if (!isLocal) {
+      return origin;
+    }
+  }
   const envUrl = (import.meta as any).env?.VITE_PUBLIC_SITE_URL as string | undefined;
   if (envUrl) return envUrl.replace(/\/$/, "");
   return DEFAULT_PUBLIC_SITE_URL;

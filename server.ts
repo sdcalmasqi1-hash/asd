@@ -49,7 +49,7 @@ function generateMembershipId(existingMembers: MemberProfile[]): string {
   return `MS${Math.floor(10000 + Math.random() * 90000)}`;
 }
 
-const DEFAULT_PUBLIC_SITE_URL = "https://almasqi-sac.org.sa";
+const DEFAULT_PUBLIC_SITE_URL = "https://almasqi-sac.onrender.com";
 
 function getPublicSiteOrigin(): string {
   const fromEnv = process.env.PUBLIC_SITE_URL || process.env.APP_URL;

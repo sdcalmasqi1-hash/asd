@@ -14,7 +14,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: PUBLIC_SITE_URL
-        value: https://almasqi-sac.org.sa
+        value: https://almasqi-sac.onrender.com
+      - key: VITE_PUBLIC_SITE_URL
+        value: https://almasqi-sac.onrender.com
       - key: FIREBASE_API_KEY
         value: AIzaSyD7JyL-5s7aNCvAa_42YZepBcrS1uaDtOw
       - key: FIREBASE_AUTH_DOMAIN
