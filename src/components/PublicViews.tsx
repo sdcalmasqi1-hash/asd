@@ -260,10 +260,21 @@ export function ContactSection({ settings }: { settings: SystemSettings }) {
               className="w-full h-full border-0"
               allowFullScreen={true}
               loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
+              referrerPolicy="strict-origin-when-cross-origin"
               title="موقع المركز الجغرافي"
             ></iframe>
           </div>
+          {settings.mapLocation && (
+            <a
+              href="https://www.google.com/maps/search/?api=1&query=%D8%A7%D9%84%D9%85%D8%B3%D9%82%D9%8A"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--primary-color)] hover:underline"
+            >
+              <MapPin className="w-4 h-4" />
+              فتح الموقع في خرائط Google
+            </a>
+          )}
         </div>
       </div>
     </div>

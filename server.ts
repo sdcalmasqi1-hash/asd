@@ -90,7 +90,7 @@ const defaultDb: DbSchema = {
     whatsapp: "966500000000",
     email: "info@almasqi-sac.org.sa",
     address: "المملكة العربية السعودية، منطقة عسير، قرية المسقي التاريخية",
-    mapLocation: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14986.738084627253!2d42.61543845000001!3d18.10657985!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x15ec92f808f972b9%3A0xc39cb62bc58cfdfc!2z2KfZhNmF2LPZgti6!5e0!3m2!1sar!2ssa!4v1700000000000!5m2!1sar!2ssa",
+    mapLocation: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d60697.904198479686!2d42.770033527260765!3d18.042876398254407!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x15fcbae38877e7f9%3A0x27e541fe2ee39028!2z2KfZhNmF2LPZgtmK!5e0!3m2!1sar!2ssa!4v1783811171001!5m2!1sar!2ssa",
     socialX: "https://x.com/almasqi_sac",
     socialInstagram: "https://instagram.com/almasqi_sac",
     socialSnapchat: "https://snapchat.com/add/almasqi_sac",
