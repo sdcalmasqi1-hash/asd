@@ -16,6 +16,7 @@ import {
   saveAdminPrograms,
   saveAdminEvents,
   saveAdminMembers,
+  adminSetMemberPassword,
   saveAdminSurveys,
   saveAdminGallery,
   saveAdminUsers,
@@ -67,6 +68,10 @@ export function AdminDashboard({
     role: "content_manager"
   });
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+
+  const [passwordEditMember, setPasswordEditMember] = useState<MemberProfile | null>(null);
+  const [newMemberPassword, setNewMemberPassword] = useState("");
+  const [confirmMemberPassword, setConfirmMemberPassword] = useState("");
 
   // Loading indicator for any action
   const [loading, setLoading] = useState(false);
@@ -459,6 +464,30 @@ export function AdminDashboard({
     } finally {
       setLoading(false);
     }
+  };
+
+  const closeMemberPasswordEditor = () => {
+    setPasswordEditMember(null);
+    setNewMemberPassword("");
+    setConfirmMemberPassword("");
+  };
+
+  const handleAdminSetMemberPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminId || !passwordEditMember) return;
+    if (newMemberPassword.trim().length < 4) {
+      setOpStatus({ type: "error", text: "كلمة السر يجب أن تكون 4 أحرف على الأقل." });
+      return;
+    }
+    if (newMemberPassword !== confirmMemberPassword) {
+      setOpStatus({ type: "error", text: "كلمة السر وتأكيدها غير متطابقين." });
+      return;
+    }
+    await saveAction(
+      `تغيير كلمة سر العضو ${passwordEditMember.id}`,
+      adminSetMemberPassword(adminId, passwordEditMember.id, newMemberPassword)
+    );
+    closeMemberPasswordEditor();
   };
 
   if (!adminId) {
@@ -3472,6 +3501,7 @@ export function AdminDashboard({
                       <th className="p-3 border">رقم العضوية</th>
                       <th className="p-3 border">رقم الجوال</th>
                       <th className="p-3 border">تاريخ الانضمام</th>
+                      <th className="p-3 border">كلمة السر</th>
                       <th className="p-3 border">الحالة</th>
                       <th className="p-3 border text-center">إجراءات المشرف</th>
                     </tr>
@@ -3488,12 +3518,32 @@ export function AdminDashboard({
                         <td className="p-3 border">{new Date(member.createdAt).toLocaleDateString("ar-SA")}</td>
                         <td className="p-3 border">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                            member.passwordHash ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {member.passwordHash ? "مُفعّلة" : "غير مُحددة"}
+                          </span>
+                        </td>
+                        <td className="p-3 border">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                             member.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-yellow-100 text-yellow-800"
                           }`}>
                             {member.status === "active" ? "نشط معتمد" : "معلق"}
                           </span>
                         </td>
-                        <td className="p-3 border text-center flex justify-center gap-1.5">
+                        <td className="p-3 border text-center flex justify-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPasswordEditMember(member);
+                              setNewMemberPassword("");
+                              setConfirmMemberPassword("");
+                            }}
+                            className="px-2 py-1 bg-blue-50 text-blue-800 font-bold rounded border border-blue-100 hover:bg-blue-100 flex items-center gap-1"
+                            title="تغيير كلمة سر العضوية"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            كلمة السر
+                          </button>
                           {member.status === "pending" && (
                             <button
                               onClick={() => {
@@ -3521,6 +3571,75 @@ export function AdminDashboard({
                   </tbody>
                 </table>
               </div>
+
+              {passwordEditMember && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                  <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6">
+                    <div className="flex justify-between items-start gap-3 mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                          <Lock className="w-5 h-5 text-[var(--primary-color)]" />
+                          تغيير كلمة سر العضوية
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {passwordEditMember.tripleName} — <span className="font-mono font-bold">{passwordEditMember.id}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closeMemberPasswordEditor}
+                        className="p-1 rounded hover:bg-slate-100"
+                        aria-label="إغلاق"
+                      >
+                        <X className="w-5 h-5 text-slate-500" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAdminSetMemberPassword} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 text-slate-700">كلمة السر الجديدة *</label>
+                        <input
+                          type="password"
+                          required
+                          minLength={4}
+                          value={newMemberPassword}
+                          onChange={(e) => setNewMemberPassword(e.target.value)}
+                          className="w-full p-3 border border-slate-200 rounded-lg text-sm"
+                          placeholder="4 أحرف على الأقل"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 text-slate-700">تأكيد كلمة السر *</label>
+                        <input
+                          type="password"
+                          required
+                          minLength={4}
+                          value={confirmMemberPassword}
+                          onChange={(e) => setConfirmMemberPassword(e.target.value)}
+                          className="w-full p-3 border border-slate-200 rounded-lg text-sm"
+                          placeholder="أعد إدخال كلمة السر"
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={closeMemberPasswordEditor}
+                          className="flex-1 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          إلغاء
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="flex-1 py-2.5 bg-[var(--primary-color)] text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50"
+                        >
+                          {loading ? "جاري الحفظ..." : "حفظ كلمة السر"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

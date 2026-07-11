@@ -1341,11 +1341,54 @@ app.post("/api/admin/faqs", checkAdminAuth(["admin", "content_manager"]), (req, 
 app.post("/api/admin/members", checkAdminAuth(["admin", "member_manager"]), (req, res) => {
   const { members } = req.body;
   if (!members) return res.status(400).json({ error: "قائمة الأعضاء مفقودة." });
-  
-  databaseState.members = members;
+
+  databaseState.members = members.map((incoming: MemberProfile) => {
+    const existing = databaseState.members.find((m) => m.id === incoming.id);
+    if (existing?.passwordHash && !incoming.passwordHash) {
+      return { ...incoming, passwordHash: existing.passwordHash };
+    }
+    return incoming;
+  });
+
   logAdminAction(req.body._adminUser, "تحديث وإدارة العضويات الرقمية والمصادقة على التغييرات.");
   saveDatabase();
-  res.json({ success: true, members: databaseState.members });
+  res.json({ success: true, members: databaseState.members.map(sanitizeMember) });
+});
+
+app.post("/api/admin/members/set-password", checkAdminAuth(["admin", "member_manager"]), (req, res) => {
+  const { memberId, password } = req.body;
+
+  if (!memberId || !password) {
+    return res.status(400).json({ error: "رقم العضوية وكلمة السر الجديدة مطلوبان." });
+  }
+
+  if (String(password).trim().length < 4) {
+    return res.status(400).json({ error: "كلمة السر يجب أن تكون 4 أحرف على الأقل." });
+  }
+
+  const index = databaseState.members.findIndex(
+    (m) => m.id.toLowerCase() === String(memberId).trim().toLowerCase()
+  );
+  if (index === -1) {
+    return res.status(404).json({ error: "العضو غير موجود." });
+  }
+
+  databaseState.members[index] = {
+    ...databaseState.members[index],
+    passwordHash: hashMemberPassword(String(password))
+  };
+
+  logAdminAction(
+    req.body._adminUser,
+    `تغيير كلمة سر العضوية ${databaseState.members[index].id} (${databaseState.members[index].tripleName}).`
+  );
+  saveDatabase();
+
+  res.json({
+    success: true,
+    message: "تم تحديث كلمة سر العضوية بنجاح.",
+    member: sanitizeMember(databaseState.members[index])
+  });
 });
 
 // Events admin management (Manage events and participant approvals)

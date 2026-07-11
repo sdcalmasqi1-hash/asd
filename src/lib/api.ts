@@ -397,6 +397,21 @@ export async function saveAdminMembers(adminId: string, members: MemberProfile[]
   return res.json();
 }
 
+export async function adminSetMemberPassword(
+  adminId: string,
+  memberId: string,
+  password: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/admin/members/set-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-id": adminId },
+    body: JSON.stringify({ memberId, password })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "فشل تحديث كلمة سر العضوية.");
+  return json;
+}
+
 export async function saveAdminEvents(adminId: string, events: EventItem[]): Promise<any> {
   const res = await fetch(`${API_BASE}/admin/events`, {
     method: "POST",
