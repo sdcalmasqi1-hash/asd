@@ -3,36 +3,62 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { EventItem, MemberProfile } from "../types";
 import { registerToEvent } from "../lib/api";
-import { Calendar, MapPin, Users, Ticket, Check, AlertCircle, Clock, ExternalLink, Search, UserCheck } from "lucide-react";
+import { Calendar, MapPin, Users, Ticket, Check, AlertCircle, Clock, ExternalLink } from "lucide-react";
 
 export function EventsSection({
   events,
   loggedInMember,
-  onEventRegisteredSuccess
+  onEventRegisteredSuccess,
+  setCurrentTab
 }: {
   events: EventItem[];
   loggedInMember: MemberProfile | null;
   onEventRegisteredSuccess: (updatedEvent: EventItem) => void;
+  setCurrentTab?: (tab: "home" | "about" | "reference" | "programs" | "memberships" | "events" | "calendar" | "gallery" | "faqs" | "contact" | "admin") => void;
 }) {
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   
   // Registration form states
   const [regName, setRegName] = useState(loggedInMember ? loggedInMember.tripleName : "");
   const [regPhone, setRegPhone] = useState(loggedInMember ? loggedInMember.phone : "");
+  const [regMemberId, setRegMemberId] = useState(loggedInMember ? loggedInMember.id : "");
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (loggedInMember) {
+      setRegName(loggedInMember.tripleName);
+      setRegPhone(loggedInMember.phone);
+      setRegMemberId(loggedInMember.id);
+    }
+  }, [loggedInMember]);
+
+  const openEvent = (evt: EventItem) => {
+    setSelectedEvent(evt);
+    if (loggedInMember) {
+      setRegName(loggedInMember.tripleName);
+      setRegPhone(loggedInMember.phone);
+      setRegMemberId(loggedInMember.id);
+    } else {
+      setRegName("");
+      setRegPhone("");
+      setRegMemberId("");
+    }
+    setError(null);
+    setSuccess(null);
+  };
+
   const handleEventBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEvent) return;
-    
-    if (!loggedInMember) {
-      setError("الرجاء تسجيل الدخول أو إصدار عضوية أولاً لتتمكن من حجز مقعدك.");
+
+    if (!regName.trim() || !regPhone.trim() || !regMemberId.trim()) {
+      setError("جميع الحقول مطلوبة لإكمال عملية الحجز (الاسم ورقم الجوال ورقم العضوية).");
       return;
     }
 
@@ -43,9 +69,9 @@ export function EventsSection({
     try {
       const response = await registerToEvent({
         eventId: selectedEvent.id,
-        memberId: loggedInMember.id,
-        name: regName,
-        phone: regPhone
+        memberId: regMemberId.trim(),
+        name: regName.trim(),
+        phone: regPhone.trim()
       });
 
       if (response.success) {
@@ -191,29 +217,65 @@ export function EventsSection({
               ) : (
                 <form onSubmit={handleEventBooking} className="space-y-4">
                   <h3 className="font-bold text-lg mb-2">تأكيد حجز مقعد فوري</h3>
-                  <p className="text-xs opacity-70">الرجاء إدخال اسمك وجوالك المرتبط ببطاقتك الرقمية لتثبيت طلب المشاركة:</p>
+                  <p className="text-xs opacity-70">الرجاء إدخال اسمك ورقم جوالك ورقم العضوية الرقمية المصدرة سابقاً لتثبيت طلب المشاركة:</p>
+
+                  {!loggedInMember && (
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[11px] text-amber-800 leading-relaxed">
+                      <p className="font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        ملاحظة:
+                      </p>
+                      <p className="mt-0.5">
+                        حجز المقاعد يتطلب وجود عضوية رقمية مصدرة مسبقاً. إذا لم تكن تملك عضوية، يمكنك إصدارها مجاناً من
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEvent(null);
+                            if (setCurrentTab) setCurrentTab("memberships");
+                          }}
+                          className="underline font-bold text-emerald-700 cursor-pointer"
+                        >
+                          صفحة العضويات
+                        </button>.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold mb-1 opacity-80">الاسم المعتمد بالبطاقة</label>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">الاسم الثلاثي للعضو</label>
                       <input
                         type="text"
                         required
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         className="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
-                        placeholder="أدخل اسمك كما بالبطاقة"
+                        placeholder="اكتب اسمك الثلاثي المسجل في العضوية"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold mb-1 opacity-80">رقم الجوال المعتمد</label>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">رقم الجوال</label>
                       <input
-                        type="text"
+                        type="tel"
                         required
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
-                        className="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)] text-left"
+                        className="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)] text-left font-mono"
                         placeholder="05xxxxxxxx"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold mb-1 opacity-80">رقم العضوية الرقمية (المصدر سابقاً)</label>
+                      <input
+                        type="text"
+                        required
+                        value={regMemberId}
+                        onChange={(e) => setRegMemberId(e.target.value)}
+                        className="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)] text-left font-mono"
+                        placeholder="مثال: AA1234"
+                        dir="ltr"
                       />
                     </div>
                   </div>
@@ -270,7 +332,7 @@ export function EventsSection({
             return (
               <div
                 key={evt.id}
-                onClick={() => setSelectedEvent(evt)}
+                onClick={() => openEvent(evt)}
                 className="group cursor-pointer bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
               >
                 <div>

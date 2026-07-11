@@ -112,6 +112,9 @@ export interface CouncilsData {
   previous: BoardMember[];
   current: BoardMember[];
   introText: string;
+  visionText?: string;
+  missionText?: string;
+  valuesText?: string;
 }
 
 export interface ReferencePage {

@@ -2115,7 +2115,7 @@ export function AdminDashboard({
               <h2 className="text-xl font-bold border-b pb-3 mb-6 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Users className="w-5 h-5 text-[var(--primary-color)]" />
-                  إدارة المجلس واللجان (النبذة التعريفية، المجلس الحالي، والمجالس السابقة)
+                  إدارة المجلس واللجان (النبذة التعريفية، الرؤية والرسالة والقيم، المجلس الحالي، والمجالس السابقة)
                 </span>
                 <button
                   onClick={() => saveAction("حفظ تعديلات المجالس واللجان بالكامل", saveAdminCouncils(adminId, councilsForm))}
@@ -2140,6 +2140,47 @@ export function AdminDashboard({
                     rows={4}
                     className="w-full p-3 border rounded-2xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
                   />
+                </div>
+
+                {/* 1b. Vision, Mission & Values */}
+                <div className="bg-white p-6 border border-slate-200 rounded-3xl space-y-4 shadow-xs">
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    رؤيتنا ورسالتنا وقيمنا الراسخة
+                  </h3>
+                  <p className="text-xs text-slate-500">تظهر هذه الفقرات في صفحة «من نحن» بجوار النبذة التعريفية.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700">رؤيتنا</label>
+                      <textarea
+                        value={councilsForm.visionText || ""}
+                        onChange={(e) => setCouncilsForm({ ...councilsForm, visionText: e.target.value })}
+                        placeholder="اكتب رؤية المركز..."
+                        rows={5}
+                        className="w-full p-3 border rounded-2xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700">رسالتنا</label>
+                      <textarea
+                        value={councilsForm.missionText || ""}
+                        onChange={(e) => setCouncilsForm({ ...councilsForm, missionText: e.target.value })}
+                        placeholder="اكتب رسالة المركز..."
+                        rows={5}
+                        className="w-full p-3 border rounded-2xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700">قيمنا الراسخة</label>
+                      <textarea
+                        value={councilsForm.valuesText || ""}
+                        onChange={(e) => setCouncilsForm({ ...councilsForm, valuesText: e.target.value })}
+                        placeholder="اكتب القيم الأساسية للمركز..."
+                        rows={5}
+                        className="w-full p-3 border rounded-2xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* 2. Current Council Board Members */}

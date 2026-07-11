@@ -792,6 +792,7 @@ export default function App() {
               <EventsSection
                 events={events.slice(0, 3)}
                 loggedInMember={loggedInMember}
+                setCurrentTab={setCurrentTab}
                 onEventRegisteredSuccess={(updatedEvent) => {
                   const updatedList = events.map(e => e.id === updatedEvent.id ? updatedEvent : e);
                   setEvents(updatedList);
@@ -855,9 +856,26 @@ export default function App() {
               </div>
               <div className="lg:col-span-5 bg-white border border-[var(--border-color)] rounded-3xl p-6 md:p-8 space-y-4 flex flex-col justify-center">
                 <h3 className="text-xl font-bold text-slate-900 border-b pb-2">رؤيتنا ورسالتنا وقيمنا الراسخة</h3>
-                <p className="text-sm opacity-95 leading-relaxed text-justify text-slate-700">
-                  إن رؤيتنا تتبلور في قيادة العمل الاجتماعي الأهلي بمنطقة عسير لتكون بلدة المسقي نموذجاً حياً للمشاريع التربوية والتطوعية المتميزة. نهدف إلى تقديم مجموعة شاملة من الخدمات والمبادرات التنموية لتمكين الطاقات البشرية، ودعم المواهب، وتيسير قنوات التدريب، بما يدعم رؤية المملكة 2030 في رفع نسب جودة الحياة ونشر الوعي الثقافي والتنموي.
-                </p>
+                <div className="space-y-4 text-sm opacity-95 leading-relaxed text-justify text-slate-700">
+                  <div>
+                    <h4 className="font-bold text-[var(--primary-color)] mb-1">رؤيتنا</h4>
+                    <p>
+                      {councils.visionText || "إن رؤيتنا تتبلور في قيادة العمل الاجتماعي الأهلي بمنطقة عسير لتكون بلدة المسقي نموذجاً حياً للمشاريع التربوية والتطوعية المتميزة."}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[var(--primary-color)] mb-1">رسالتنا</h4>
+                    <p>
+                      {councils.missionText || "نهدف إلى تقديم مجموعة شاملة من الخدمات والمبادرات التنموية لتمكين الطاقات البشرية، ودعم المواهب، وتيسير قنوات التدريب، بما يدعم رؤية المملكة 2030 في رفع نسب جودة الحياة ونشر الوعي الثقافي والتنموي."}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[var(--primary-color)] mb-1">قيمنا الراسخة</h4>
+                    <p>
+                      {councils.valuesText || "المواطنة الفاعلة، العمل التطوعي، الشفافية والحوكمة، التميز المجتمعي، والالتزام بخدمة أهالي قرية المسقي وتراثها العريق."}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -963,6 +981,7 @@ export default function App() {
           <EventsSection
             events={events}
             loggedInMember={loggedInMember}
+            setCurrentTab={setCurrentTab}
             onEventRegisteredSuccess={(updatedEvent) => {
               const updatedList = events.map(e => e.id === updatedEvent.id ? updatedEvent : e);
               setEvents(updatedList);
