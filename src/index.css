@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* 
+ * Custom Dynamic Visual Identity CSS Custom Properties 
+ * These map to the live customizations loaded from the Express DB
+ */
+:root {
+  --primary-color: #15803d;
+  --secondary-color: #0f172a;
+  --button-bg: #16a34a;
+  --button-text: #ffffff;
+  --heading-color: #111827;
+  --text-color: #374151;
+  --bg-color: #f8fafc;
+  --nav-bg: #ffffff;
+  --footer-bg: #0f172a;
+  --card-bg: #ffffff;
+  --border-color: #e2e8f0;
+  --input-bg: #ffffff;
+  
+  --primary-font: 'Cairo', 'Tajawal', sans-serif;
+  --heading-font: 'Cairo', 'Tajawal', sans-serif;
+  --text-font: 'Cairo', sans-serif;
+}
+
+body {
+  font-family: var(--text-font);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  direction: rtl;
+  text-align: right;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Global Image Opacity with smooth transition and hover restoration */
+img {
+  opacity: var(--image-opacity, 1);
+  transition: opacity 0.3s ease-in-out;
+}
+img:hover {
+  opacity: 1;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--heading-font);
+  color: var(--heading-color);
+}
+
+/* Custom Scrollbar for premium RTL feeling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  filter: brightness(0.9);
+}
+
+/* Print Styles for beautiful PDF Card downloads */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

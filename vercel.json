@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/v/:memberId", "destination": "/?tab=memberships&member=:memberId" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
