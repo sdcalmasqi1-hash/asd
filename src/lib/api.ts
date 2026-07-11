@@ -145,6 +145,7 @@ export async function registerMember(data: {
   birthDate: string;
   calendarType: "hijri" | "gregorian";
   gender: "male" | "female";
+  password: string;
 }): Promise<{ success: boolean; message: string; member: MemberProfile }> {
   const res = await fetch(`${API_BASE}/members/register`, {
     method: "POST",
@@ -157,14 +158,31 @@ export async function registerMember(data: {
 }
 
 // Member Authentication
-export async function loginMember(memberId: string, phone: string): Promise<{ success: boolean; member: MemberProfile }> {
+export async function loginMember(
+  memberId: string,
+  phone: string,
+  password: string
+): Promise<{ success: boolean; member: MemberProfile }> {
   const res = await fetch(`${API_BASE}/members/auth`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ memberId, phone })
+    body: JSON.stringify({ memberId, phone, password })
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "بيانات العضوية غير صحيحة.");
+  return json;
+}
+
+export async function lookupMembersByPhone(
+  phone: string
+): Promise<{ success: boolean; count: number; members: Array<{ id: string; tripleName: string }> }> {
+  const res = await fetch(`${API_BASE}/members/lookup-phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "فشل البحث عن العضوية.");
   return json;
 }
 

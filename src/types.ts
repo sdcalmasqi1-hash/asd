@@ -161,6 +161,7 @@ export interface MemberProfile {
   createdAt: string;
   qrCodeUrl: string;
   expiryDate?: string;
+  passwordHash?: string;
 }
 
 export interface EventRegistration {

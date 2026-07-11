@@ -8,13 +8,14 @@ import { MemberProfile, SystemSettings } from "../types";
 import {
   registerMember,
   loginMember,
+  lookupMembersByPhone,
   updateMemberProfile,
   buildMembershipVerifyUrl,
   verifyMemberById,
   VerifiedMemberProfile
 } from "../lib/api";
 import { MembershipQrCode, renderMembershipQrDataUrl } from "./MembershipQrCode";
-import { CreditCard, LogIn, UserPlus, Image as ImageIcon, QrCode, Download, Share2, Printer, Search, CheckCircle, Clock, AlertCircle, FileText } from "lucide-react";
+import { CreditCard, LogIn, UserPlus, Image as ImageIcon, QrCode, Download, Share2, Printer, Search, CheckCircle, Clock, AlertCircle, FileText, Lock } from "lucide-react";
 
 const hijriMonths = [
   { value: "01", label: "01 - محرم" },
@@ -90,15 +91,20 @@ export function MembershipSection({
     email: "",
     birthDate: "1995-08-15",
     calendarType: "gregorian" as "hijri" | "gregorian",
-    gender: "male" as "male" | "female"
+    gender: "male" as "male" | "female",
+    password: "",
+    confirmPassword: ""
   });
 
   // Login state
-  const [loginData, setLoginData] = useState({ memberId: "", phone: "" });
+  const [loginData, setLoginData] = useState({ memberId: "", phone: "", password: "" });
 
   // Account Recovery state
   const [recoveryPhone, setRecoveryPhone] = useState("");
-  const [recoveredMembers, setRecoveredMembers] = useState<MemberProfile[] | null>(null);
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryStep, setRecoveryStep] = useState<"phone" | "password">("phone");
+  const [recoveryCandidates, setRecoveryCandidates] = useState<Array<{ id: string; tripleName: string }>>([]);
+  const [selectedRecoveryMemberId, setSelectedRecoveryMemberId] = useState("");
 
   // General indicators
   const [loading, setLoading] = useState(false);
@@ -157,10 +163,21 @@ export function MembershipSection({
     setLoading(true);
     setError(null);
     setSuccess(null);
+    if (regData.password.trim().length < 4) {
+      setError("كلمة سر العضوية يجب أن تكون 4 أحرف على الأقل.");
+      setLoading(false);
+      return;
+    }
+    if (regData.password !== regData.confirmPassword) {
+      setError("كلمة سر العضوية وتأكيدها غير متطابقين.");
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await registerMember(regData);
+      const { confirmPassword, ...payload } = regData;
+      const response = await registerMember(payload);
       if (response.success) {
-        setSuccess("تم إنشاء عضويتك الرقمية بنجاح! جاري تحميل البطاقة...");
+        setSuccess("تم إنشاء عضويتك الرقمية بنجاح! احفظ كلمة السر — ستحتاجها لعرض بطاقتك لاحقاً.");
         setTimeout(() => {
           onLoginSuccess(response.member);
           setSuccess(null);
@@ -179,7 +196,7 @@ export function MembershipSection({
     setLoading(true);
     setError(null);
     try {
-      const response = await loginMember(loginData.memberId, loginData.phone);
+      const response = await loginMember(loginData.memberId, loginData.phone, loginData.password);
       if (response.success) {
         onLoginSuccess(response.member);
       }
@@ -190,41 +207,51 @@ export function MembershipSection({
     }
   };
 
-  // Handle membership search / recovery
-  const handleRecovery = async (e: React.FormEvent) => {
+  const resetRecoveryFlow = () => {
+    setRecoveryStep("phone");
+    setRecoveryCandidates([]);
+    setSelectedRecoveryMemberId("");
+    setRecoveryPassword("");
+  };
+
+  const handleRecoveryPhoneSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setRecoveredMembers(null);
+    setRecoveryCandidates([]);
     try {
-      const res = await fetch(`/api/public/data`);
-      const publicData = await res.json();
-      
-      // Let's find members by phone via a simple public-safe check
-      // To bypass security we request the server search or search locally safely
-      const searchRes = await fetch(`/api/members/register`); // standard fetch is secure, let's fetch matching directly
-      // Better yet, search in current state
-      const findRes = await fetch("/api/public/data");
-      const findJson = await findRes.json();
-      // Wait, let's retrieve all matching from members list
-      const allMembersRes = await fetch("/api/admin/full-data", {
-        headers: { "x-admin-id": "a1" } // use admin mock bypass safely to let users retrieve lost cards
-      });
-      if (allMembersRes.ok) {
-        const allDb = await allMembersRes.json();
-        const found = allDb.members.filter((m: MemberProfile) => m.phone.trim() === recoveryPhone.trim());
-        if (found && found.length > 0) {
-          setRecoveredMembers(found);
-          setError(null);
-        } else {
-          setError("عذراً، لم يتم العثور على أي بطاقة عضوية مسجلة برقم الجوال المدخل.");
-        }
-      } else {
-        // Fallback simulated search
-        setError("فشلت عملية البحث. يرجى التواصل مع الدعم الفني للمركز.");
+      const response = await lookupMembersByPhone(recoveryPhone.trim());
+      if (response.success && response.members.length > 0) {
+        setRecoveryCandidates(response.members);
+        setSelectedRecoveryMemberId(response.members.length === 1 ? response.members[0].id : "");
+        setRecoveryStep("password");
+        setRecoveryPassword("");
       }
-    } catch (err) {
-      setError("فشلت عملية البحث المباشر.");
+    } catch (err: any) {
+      setError(err.message || "فشلت عملية البحث.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecoveryPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (recoveryCandidates.length > 1 && !selectedRecoveryMemberId) {
+      setError("يرجى اختيار العضوية المراد عرضها.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const memberId = selectedRecoveryMemberId || recoveryCandidates[0]?.id || "";
+      const response = await loginMember(memberId, recoveryPhone.trim(), recoveryPassword);
+      if (response.success) {
+        onLoginSuccess(response.member);
+        resetRecoveryFlow();
+        setRecoveryPhone("");
+      }
+    } catch (err: any) {
+      setError(err.message || "كلمة سر العضوية غير صحيحة.");
     } finally {
       setLoading(false);
     }
@@ -761,7 +788,7 @@ export function MembershipSection({
               عرض بطاقة العضوية
             </button>
             <button
-              onClick={() => { setActiveTab("recover"); setError(null); }}
+              onClick={() => { setActiveTab("recover"); setError(null); resetRecoveryFlow(); }}
               className={`pb-3 px-6 font-bold text-base flex items-center gap-1.5 border-b-2 transition-all ${
                 activeTab === "recover" ? "border-[var(--primary-color)] text-[var(--primary-color)]" : "border-transparent opacity-60"
               }`}
@@ -791,7 +818,7 @@ export function MembershipSection({
               <div className="mb-6 text-center">
                 <CreditCard className="w-12 h-12 text-[var(--primary-color)] mx-auto mb-2" />
                 <h2 className="text-xl font-bold">تسجيل طلب عضوية جديدة</h2>
-                <p className="text-xs opacity-70 mt-1">أدخل بياناتك بالكامل لإصدار بطاقتك الرقمية الفورية مجاناً بالكامل وبدون الحاجة لأي مفتاح تفعيل أو كود</p>
+                <p className="text-xs opacity-70 mt-1">أدخل بياناتك بالكامل واختر كلمة سر خاصة ببطاقتك — ستحتاجها لعرضها لاحقاً</p>
               </div>
 
               <form onSubmit={handleRegister} className="space-y-4">
@@ -917,6 +944,33 @@ export function MembershipSection({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-85">كلمة سر العضوية *</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={4}
+                      value={regData.password}
+                      onChange={(e) => setRegData({ ...regData, password: e.target.value })}
+                      className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
+                      placeholder="4 أحرف على الأقل"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-85">تأكيد كلمة السر *</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={4}
+                      value={regData.confirmPassword}
+                      onChange={(e) => setRegData({ ...regData, confirmPassword: e.target.value })}
+                      className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
+                      placeholder="أعد إدخال كلمة السر"
+                    />
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -935,7 +989,7 @@ export function MembershipSection({
               <div className="mb-6 text-center">
                 <LogIn className="w-12 h-12 text-[var(--primary-color)] mx-auto mb-2" />
                 <h2 className="text-xl font-bold">تسجيل الدخول وعرض البطاقة</h2>
-                <p className="text-xs opacity-70 mt-1">أدخل رقم العضوية المكون من حرفين وأربعة أرقام مع رقم جوالك المسجل</p>
+                <p className="text-xs opacity-70 mt-1">أدخل رقم العضوية ورقم الجوال وكلمة سر البطاقة لعرضها</p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-4">
@@ -963,6 +1017,19 @@ export function MembershipSection({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-85">كلمة سر العضوية *</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    value={loginData.password}
+                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
+                    placeholder="كلمة السر التي أنشأتها مع العضوية"
+                  />
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -981,58 +1048,102 @@ export function MembershipSection({
               <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl p-6 md:p-8 shadow-sm">
                 <div className="mb-6 text-center">
                   <Search className="w-12 h-12 text-[var(--primary-color)] mx-auto mb-2" />
-                  <h2 className="text-xl font-bold">استعادة رقم العضوية المفقود</h2>
-                  <p className="text-xs opacity-70 mt-1">أدخل رقم جوالك المسجل للبحث عن بطاقتك الرقمية المسجلة مسبقاً</p>
+                  <h2 className="text-xl font-bold">استعادة بطاقة العضوية</h2>
+                  <p className="text-xs opacity-70 mt-1">
+                    {recoveryStep === "phone"
+                      ? "أدخل رقم جوالك المسجل للبحث عن عضويتك"
+                      : "أدخل كلمة سر العضوية لعرض بطاقتك"}
+                  </p>
                 </div>
 
-                <form onSubmit={handleRecovery} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 opacity-85">رقم الجوال المعتمد *</label>
-                    <input
-                      type="text"
-                      required
-                      value={recoveryPhone}
-                      onChange={(e) => setRecoveryPhone(e.target.value)}
-                      className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)] text-left font-semibold"
-                      placeholder="05xxxxxxxx"
-                    />
-                  </div>
+                {recoveryStep === "phone" ? (
+                  <form onSubmit={handleRecoveryPhoneSearch} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-85">رقم الجوال المعتمد *</label>
+                      <input
+                        type="text"
+                        required
+                        value={recoveryPhone}
+                        onChange={(e) => setRecoveryPhone(e.target.value)}
+                        className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)] text-left font-semibold"
+                        placeholder="05xxxxxxxx"
+                      />
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3 bg-[var(--button-bg)] text-[var(--button-text)] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  >
-                    <Search className="w-5 h-5" />
-                    {loading ? "جاري البحث في قاعدة البيانات..." : "البحث عن العضوية"}
-                  </button>
-                </form>
-              </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-[var(--button-bg)] text-[var(--button-text)] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      <Search className="w-5 h-5" />
+                      {loading ? "جاري البحث..." : "البحث عن العضوية"}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleRecoveryPasswordSubmit} className="space-y-4">
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-900">
+                      تم العثور على {recoveryCandidates.length} عضوية مسجلة برقم <strong dir="ltr">{recoveryPhone}</strong>
+                    </div>
 
-              {/* Recovery Search Results */}
-              {recoveredMembers && recoveredMembers.length > 0 && (
-                <div className="bg-white border border-[var(--border-color)] rounded-2xl p-6 shadow-sm space-y-4">
-                  <h3 className="font-bold text-lg text-slate-800">العضويات الرقمية الموجودة برقمك:</h3>
-                  <div className="space-y-3">
-                    {recoveredMembers.map((m) => (
-                      <div key={m.id} className="flex justify-between items-center p-4 bg-slate-50 border rounded-xl">
-                        <div>
-                          <p className="font-bold text-slate-900">{m.tripleName}</p>
-                          <p className="text-xs text-slate-500">رقم العضوية: <strong className="text-[var(--primary-color)] font-mono text-sm">{m.id}</strong></p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            onLoginSuccess(m);
-                          }}
-                          className="px-4 py-2 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-lg hover:bg-emerald-100 transition-colors"
+                    {recoveryCandidates.length > 1 && (
+                      <div>
+                        <label className="block text-xs font-semibold mb-1 opacity-85">اختر العضوية *</label>
+                        <select
+                          required
+                          value={selectedRecoveryMemberId}
+                          onChange={(e) => setSelectedRecoveryMemberId(e.target.value)}
+                          className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
                         >
-                          تصفح البطاقة
-                        </button>
+                          <option value="">— اختر العضوية —</option>
+                          {recoveryCandidates.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.tripleName} ({m.id})
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    )}
+
+                    {recoveryCandidates.length === 1 && (
+                      <div className="p-3 bg-slate-50 border rounded-xl text-sm">
+                        <p className="font-bold text-slate-800">{recoveryCandidates[0].tripleName}</p>
+                        <p className="text-xs text-slate-500 mt-1">رقم العضوية: <span className="font-mono font-bold text-[var(--primary-color)]">{recoveryCandidates[0].id}</span></p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-85">كلمة سر العضوية *</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={4}
+                        value={recoveryPassword}
+                        onChange={(e) => setRecoveryPassword(e.target.value)}
+                        className="w-full p-3 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--input-bg)]"
+                        placeholder="أدخل كلمة السر لعرض البطاقة"
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={resetRecoveryFlow}
+                        className="w-full py-3 border border-[var(--border-color)] rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                      >
+                        رجوع
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-[var(--button-bg)] text-[var(--button-text)] rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        <Lock className="w-5 h-5" />
+                        {loading ? "جاري التحقق..." : "عرض البطاقة"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
 

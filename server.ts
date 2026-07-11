@@ -6,6 +6,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { initializeApp as initializeFirebaseApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -59,6 +60,20 @@ function getPublicSiteOrigin(): string {
 function buildMemberVerifyLink(member: MemberProfile): string {
   const id = member.id.trim().toUpperCase();
   return `${getPublicSiteOrigin()}/?tab=memberships&member=${encodeURIComponent(id)}`;
+}
+
+function hashMemberPassword(password: string): string {
+  return crypto.createHash("sha256").update(password.trim()).digest("hex");
+}
+
+function verifyMemberPassword(member: MemberProfile, password: string): boolean {
+  if (!member.passwordHash) return true;
+  return member.passwordHash === hashMemberPassword(password);
+}
+
+function sanitizeMember(member: MemberProfile): MemberProfile {
+  const { passwordHash: _removed, ...safeMember } = member;
+  return safeMember as MemberProfile;
 }
 
 function getRequestOrigin(req: express.Request): string {
@@ -729,10 +744,14 @@ app.get("/api/public/data", (req, res) => {
 
 // Member registration (Public)
 app.post("/api/members/register", (req, res) => {
-  const { tripleName, phone, email, birthDate, calendarType, gender } = req.body;
+  const { tripleName, phone, email, birthDate, calendarType, gender, password } = req.body;
   
-  if (!tripleName || !phone || !birthDate || !calendarType || !gender) {
-    return res.status(400).json({ error: "الرجاء تعبئة الحقول الإجبارية (الاسم الثلاثي، رقم الجوال، تاريخ الميلاد والتقويم وتحديد الجنس)." });
+  if (!tripleName || !phone || !birthDate || !calendarType || !gender || !password) {
+    return res.status(400).json({ error: "الرجاء تعبئة الحقول الإجبارية (الاسم الثلاثي، رقم الجوال، تاريخ الميلاد، الجنس، وكلمة سر العضوية)." });
+  }
+
+  if (String(password).trim().length < 4) {
+    return res.status(400).json({ error: "كلمة سر العضوية يجب أن تكون 4 أحرف على الأقل." });
   }
 
   // Generate unique member ID AA1234
@@ -749,7 +768,8 @@ app.post("/api/members/register", (req, res) => {
     status: "active", // Active by default or pending based on admin config
     createdAt: new Date().toISOString(),
     qrCodeUrl: "",
-    expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split("T")[0] // 2 years default
+    expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split("T")[0], // 2 years default
+    passwordHash: hashMemberPassword(String(password))
   };
   newMember.qrCodeUrl = buildMemberVerifyLink(newMember);
 
@@ -759,29 +779,72 @@ app.post("/api/members/register", (req, res) => {
   res.json({
     success: true,
     message: "تم إنشاء العضوية الرقمية بنجاح!",
-    member: newMember
+    member: sanitizeMember(newMember)
   });
 });
 
-// Member Auth/Login via Membership ID + Phone Number
-app.post("/api/members/auth", (req, res) => {
-  const { memberId, phone } = req.body;
-  
-  if (!memberId || !phone) {
-    return res.status(400).json({ error: "الرجاء إدخال رقم العضوية ورقم الجوال." });
+// Lookup memberships by phone (no card data until password is verified)
+app.post("/api/members/lookup-phone", (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ error: "الرجاء إدخال رقم الجوال." });
   }
 
-  const member = databaseState.members.find(
-    (m) => m.id.toLowerCase() === memberId.trim().toLowerCase() && m.phone.trim() === phone.trim()
-  );
+  const matches = databaseState.members.filter((m) => m.phone.trim() === String(phone).trim());
+  if (matches.length === 0) {
+    return res.status(404).json({ error: "عذراً، لم يتم العثور على أي بطاقة عضوية مسجلة برقم الجوال المدخل." });
+  }
+
+  res.json({
+    success: true,
+    count: matches.length,
+    members: matches.map((m) => ({
+      id: m.id,
+      tripleName: m.tripleName
+    }))
+  });
+});
+
+// Member Auth/Login via Membership ID + Phone Number + Password
+app.post("/api/members/auth", (req, res) => {
+  const { memberId, phone, password } = req.body;
+  
+  if (!phone || !password) {
+    return res.status(400).json({ error: "الرجاء إدخال رقم الجوال وكلمة سر العضوية." });
+  }
+
+  let member: MemberProfile | undefined;
+
+  if (memberId) {
+    member = databaseState.members.find(
+      (m) =>
+        m.id.toLowerCase() === String(memberId).trim().toLowerCase() &&
+        m.phone.trim() === String(phone).trim()
+    );
+  } else {
+    const phoneMatches = databaseState.members.filter((m) => m.phone.trim() === String(phone).trim());
+    if (phoneMatches.length === 1) {
+      member = phoneMatches[0];
+    } else if (phoneMatches.length > 1) {
+      return res.status(409).json({
+        error: "يوجد أكثر من عضوية مسجلة على هذا الرقم. يرجى تحديد رقم العضوية.",
+        members: phoneMatches.map((m) => ({ id: m.id, tripleName: m.tripleName }))
+      });
+    }
+  }
 
   if (!member) {
     return res.status(401).json({ error: "رقم العضوية أو رقم الجوال المدخل غير صحيح." });
   }
 
+  if (!verifyMemberPassword(member, String(password))) {
+    return res.status(401).json({ error: "كلمة سر العضوية غير صحيحة." });
+  }
+
   res.json({
     success: true,
-    member
+    member: sanitizeMember(member)
   });
 });
 
@@ -820,7 +883,7 @@ app.get("/v/:memberId", (req, res) => {
 
 // Update Member Profile (Public or Self-service)
 app.post("/api/members/update", (req, res) => {
-  const { memberId, tripleName, phone, email, birthDate, calendarType, gender } = req.body;
+  const { memberId, tripleName, phone, email, birthDate, calendarType, gender, password, currentPassword } = req.body;
   
   const index = databaseState.members.findIndex((m) => m.id === memberId);
   if (index === -1) {
@@ -828,6 +891,19 @@ app.post("/api/members/update", (req, res) => {
   }
 
   const member = databaseState.members[index];
+
+  if (password) {
+    if (String(password).trim().length < 4) {
+      return res.status(400).json({ error: "كلمة سر العضوية الجديدة يجب أن تكون 4 أحرف على الأقل." });
+    }
+    if (member.passwordHash && !currentPassword) {
+      return res.status(400).json({ error: "الرجاء إدخال كلمة السر الحالية لتغيير كلمة السر." });
+    }
+    if (member.passwordHash && !verifyMemberPassword(member, String(currentPassword))) {
+      return res.status(401).json({ error: "كلمة السر الحالية غير صحيحة." });
+    }
+  }
+
   const updated: MemberProfile = {
     ...member,
     tripleName: tripleName || member.tripleName,
@@ -835,13 +911,14 @@ app.post("/api/members/update", (req, res) => {
     email: email !== undefined ? email : member.email,
     birthDate: birthDate || member.birthDate,
     calendarType: calendarType || member.calendarType,
-    gender: gender || member.gender
+    gender: gender || member.gender,
+    passwordHash: password ? hashMemberPassword(String(password)) : member.passwordHash
   };
   updated.qrCodeUrl = buildMemberVerifyLink(updated);
   databaseState.members[index] = updated;
 
   saveDatabase();
-  res.json({ success: true, member: databaseState.members[index] });
+  res.json({ success: true, member: sanitizeMember(databaseState.members[index]) });
 });
 
 // Event Registration (Public for Members)
